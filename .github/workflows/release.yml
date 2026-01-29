@@ -1,0 +1,94 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux
+            binary: colorls-linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: aarch64-linux
+            binary: colorls-linux-aarch64
+          - os: macos-13
+            target: x86_64-darwin
+            binary: colorls-darwin-x86_64
+          - os: macos-latest
+            target: aarch64-darwin
+            binary: colorls-darwin-aarch64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+
+      - name: Install dependencies
+        run: shards install --production
+
+      - name: Build release binary
+        run: |
+          crystal build src/colorls_cli.cr -o ${{ matrix.binary }} --release --no-debug
+          chmod +x ${{ matrix.binary }}
+
+      - name: Compress binary
+        run: |
+          tar czf ${{ matrix.binary }}.tar.gz ${{ matrix.binary }}
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            ${{ matrix.binary }}.tar.gz \
+            --clobber
+
+  build-static-linux:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            binary: colorls-linux-x86_64-static
+            image: crystallang/crystal:latest-alpine
+          - arch: aarch64
+            binary: colorls-linux-aarch64-static
+            image: crystallang/crystal:latest-alpine
+
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: shards install --production
+
+      - name: Build static release binary
+        run: |
+          crystal build src/colorls_cli.cr -o ${{ matrix.binary }} --release --no-debug --static
+          chmod +x ${{ matrix.binary }}
+
+      - name: Compress binary
+        run: |
+          tar czf ${{ matrix.binary }}.tar.gz ${{ matrix.binary }}
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            ${{ matrix.binary }}.tar.gz \
+            --clobber

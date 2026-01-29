@@ -24,13 +24,38 @@ A Crystal rewrite inspired by [colorls](https://github.com/athityakumar/colorls)
 
 ## Installation
 
-### As a standalone tool
+### Prebuilt binaries
+
+Prebuilt binaries are available for each [GitHub release](https://github.com/wyhaines/colorls.cr/releases). Download the archive for your platform, extract it, and place the binary on your `PATH`:
+
+```bash
+# Example for Linux x86_64 (static build, works on any distro)
+tar xzf colorls-linux-x86_64-static.tar.gz
+sudo mv colorls-linux-x86_64-static /usr/local/bin/colorls
+```
+
+Available builds:
+
+| Archive | Platform |
+|---------|----------|
+| `colorls-linux-x86_64-static.tar.gz` | Linux x86_64 (static, portable) |
+| `colorls-linux-aarch64-static.tar.gz` | Linux ARM64 (static, portable) |
+| `colorls-linux-x86_64.tar.gz` | Linux x86_64 (dynamic) |
+| `colorls-linux-aarch64.tar.gz` | Linux ARM64 (dynamic) |
+| `colorls-darwin-x86_64.tar.gz` | macOS Intel |
+| `colorls-darwin-aarch64.tar.gz` | macOS Apple Silicon |
+
+The static Linux builds have no runtime dependencies and work on any Linux distribution. The dynamic builds require a compatible system libc.
+
+### Building from source
+
+If a prebuilt binary isn't available for your platform, or you prefer to build from source:
 
 ```bash
 crystal build src/colorls_cli.cr -o bin/colorls --release
 ```
 
-Copy `bin/colorls` somewhere on your `PATH`.
+Copy `bin/colorls` somewhere on your `PATH`. Requires Crystal >= 1.15.0.
 
 ### As a shard dependency
 
