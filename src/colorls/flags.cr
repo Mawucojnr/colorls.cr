@@ -69,7 +69,7 @@ module Colorls
       core.ls_files(files) unless files.empty?
 
       dirs.sort_by! { |dir| strxfrm(dir.name) }
-      dirs.each_with_index do |dir, _idx|
+      dirs.each do |dir|
         puts "\n#{dir.show}:" if @args.size > 1
         begin
           core.ls_dir(dir)
@@ -419,29 +419,26 @@ module Colorls
     end
 
     private def parse_block_size(str : String) : Int64
-      multiplier = 1_i64
       s = str.strip.upcase
-      if s.ends_with?("K")
-        multiplier = 1024_i64
-        s = s.chomp("K")
-      elsif s.ends_with?("M")
-        multiplier = 1024_i64 * 1024
-        s = s.chomp("M")
-      elsif s.ends_with?("G")
-        multiplier = 1024_i64 * 1024 * 1024
-        s = s.chomp("G")
-      elsif s.ends_with?("KB")
-        multiplier = 1000_i64
-        s = s.chomp("KB")
-      elsif s.ends_with?("MB")
-        multiplier = 1000_i64 * 1000
-        s = s.chomp("MB")
-      elsif s.ends_with?("GB")
-        multiplier = 1000_i64 * 1000 * 1000
-        s = s.chomp("GB")
-      end
-      base = s.to_i64? || 1_i64
-      base * multiplier
+      # Check two-letter suffixes before single-letter to avoid false matches
+      pair = if s.ends_with?("GB")
+               {"GB", 1000_i64 * 1000 * 1000}
+             elsif s.ends_with?("MB")
+               {"MB", 1000_i64 * 1000}
+             elsif s.ends_with?("KB")
+               {"KB", 1000_i64}
+             elsif s.ends_with?("G")
+               {"G", 1024_i64 * 1024 * 1024}
+             elsif s.ends_with?("M")
+               {"M", 1024_i64 * 1024}
+             elsif s.ends_with?("K")
+               {"K", 1024_i64}
+             else
+               {"", 1_i64}
+             end
+      suffix, multiplier = pair
+      s = s.chomp(suffix) unless suffix.empty?
+      (s.to_i64? || 1_i64) * multiplier
     end
 
     private def show_help(opts : OptionParser)

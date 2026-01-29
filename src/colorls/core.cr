@@ -251,13 +251,8 @@ module Colorls
     end
 
     private def apply_pattern_filters
-      if @ignore_backups
-        @contents.reject!(&.name.ends_with?('~'))
-      end
-      @hide_patterns.each do |pattern|
-        @contents.reject! { |entry| File.match?(pattern, entry.name) }
-      end
-      @ignore_patterns.each do |pattern|
+      @contents.reject!(&.name.ends_with?('~')) if @ignore_backups
+      (@hide_patterns + @ignore_patterns).each do |pattern|
         @contents.reject! { |entry| File.match?(pattern, entry.name) }
       end
     end
@@ -390,17 +385,14 @@ module Colorls
       base = @si_units ? 1000.0 : 1024.0
       units = @si_units ? ["B", "kB", "MB", "GB", "TB"] : ["B", "K", "M", "G", "T"]
 
-      if bytes < base
-        "#{bytes} #{units[0]}"
-      elsif bytes < base * base
-        "#{"%.0f" % (bytes / base)} #{units[1]}"
-      elsif bytes < base * base * base
-        "#{"%.0f" % (bytes / (base * base))} #{units[2]}"
-      elsif bytes < base * base * base * base
-        "#{"%.0f" % (bytes / (base * base * base))} #{units[3]}"
-      else
-        "#{"%.0f" % (bytes / (base * base * base * base))} #{units[4]}"
+      value = bytes.to_f
+      units.each_with_index do |unit, i|
+        if value < base || i == units.size - 1
+          return i == 0 ? "#{bytes} #{unit}" : "#{"%.0f" % value} #{unit}"
+        end
+        value /= base
       end
+      "#{bytes} #{units[0]}"
     end
 
     private def size_info(filesize : Int64) : String
@@ -629,11 +621,7 @@ module Colorls
     end
 
     private def update_content_if_show_symbol_dest(content : FileInfo) : FileInfo
-      return content unless @show_symbol_dest
-      return content unless content.symlink?
-      return content if content.link_target.nil?
-      return content if content.dead?
-      if target = content.link_target
+      if @show_symbol_dest && content.symlink? && !content.dead? && (target = content.link_target)
         FileInfo.info(target)
       else
         content

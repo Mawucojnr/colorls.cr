@@ -160,33 +160,11 @@ module Colorls
     end
 
     def owner : String
-      uid = @info.owner_id.to_u32
-      return @@users[uid] if @@users.has_key?(uid)
-      buf = Bytes.new(1024)
-      pwd = uninitialized ::LibC::Passwd
-      result = Pointer(::LibC::Passwd).null
-      ret = ::LibC.getpwuid_r(uid, pointerof(pwd), buf.to_unsafe.as(Pointer(::LibC::Char)), buf.size, pointerof(result))
-      if ret == 0 && !result.null?
-        @@users[uid] = String.new(pwd.pw_name)
-      else
-        @@users[uid] = uid.to_s
-      end
-      @@users[uid]
+      @@users[uid] ||= lookup_user(uid)
     end
 
     def group : String
-      gid = @info.group_id.to_u32
-      return @@groups[gid] if @@groups.has_key?(gid)
-      buf = Bytes.new(1024)
-      grp = uninitialized ::LibC::Group
-      result = Pointer(::LibC::Group).null
-      ret = ::LibC.getgrgid_r(gid, pointerof(grp), buf.to_unsafe.as(Pointer(::LibC::Char)), buf.size, pointerof(result))
-      if ret == 0 && !result.null?
-        @@groups[gid] = String.new(grp.gr_name)
-      else
-        @@groups[gid] = gid.to_s
-      end
-      @@groups[gid]
+      @@groups[gid] ||= lookup_group(gid)
     end
 
     def to_s(io : IO) : Nil
@@ -201,11 +179,23 @@ module Colorls
     end
 
     private def set_show_name(show_filepath : Bool) : String
-      if show_filepath && !directory?
-        @path
-      else
-        @name
-      end
+      show_filepath && !directory? ? @path : @name
+    end
+
+    private def lookup_user(uid : UInt32) : String
+      buf = Bytes.new(1024)
+      pwd = uninitialized ::LibC::Passwd
+      result = Pointer(::LibC::Passwd).null
+      ret = ::LibC.getpwuid_r(uid, pointerof(pwd), buf.to_unsafe.as(Pointer(::LibC::Char)), buf.size, pointerof(result))
+      ret == 0 && !result.null? ? String.new(pwd.pw_name) : uid.to_s
+    end
+
+    private def lookup_group(gid : UInt32) : String
+      buf = Bytes.new(1024)
+      grp = uninitialized ::LibC::Group
+      result = Pointer(::LibC::Group).null
+      ret = ::LibC.getgrgid_r(gid, pointerof(grp), buf.to_unsafe.as(Pointer(::LibC::Char)), buf.size, pointerof(result))
+      ret == 0 && !result.null? ? String.new(grp.gr_name) : gid.to_s
     end
   end
 end
