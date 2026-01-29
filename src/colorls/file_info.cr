@@ -79,6 +79,53 @@ module Colorls
       @info.modification_time
     end
 
+    def atime : Time
+      stat = raw_stat
+      Time.unix(stat.st_atim.tv_sec) + Time::Span.new(nanoseconds: stat.st_atim.tv_nsec)
+    end
+
+    def ctime : Time
+      stat = raw_stat
+      Time.unix(stat.st_ctim.tv_sec) + Time::Span.new(nanoseconds: stat.st_ctim.tv_nsec)
+    end
+
+    def blocks : Int64
+      raw_stat.st_blocks.to_i64
+    end
+
+    def uid : UInt32
+      @info.owner_id.to_u32
+    end
+
+    def gid : UInt32
+      @info.group_id.to_u32
+    end
+
+    def owner_or_uid(numeric : Bool) : String
+      numeric ? uid.to_s : owner
+    end
+
+    def group_or_gid(numeric : Bool) : String
+      numeric ? gid.to_s : group
+    end
+
+    def author : String
+      owner
+    end
+
+    def time_for(field : Colorls::TimeField) : Time
+      case field
+      when TimeField::Access       then atime
+      when TimeField::Change       then ctime
+      when TimeField::Modification then mtime
+      else                              mtime
+      end
+    end
+
+    def pipe? : Bool
+      @info.type == File::Type::Pipe
+    end
+
     def link_target : String?
       @target
     end

@@ -21,6 +21,9 @@ crystal spec
 # Run a single spec file
 crystal spec spec/colorls/core_spec.cr
 
+# Lint
+./bin/ameba
+
 # Install dependencies
 shards install
 ```
@@ -48,7 +51,8 @@ Crystal >= 1.15.0 is required (see `shard.yml`).
 
 ## Dependencies
 
-- **unicode_width** (local path `../unicode_width.cr`) — terminal display width calculations for multi-byte characters
+- **unicode_width** (`wyhaines/unicode_width.cr`) — terminal display width calculations for multi-byte characters
+- **ameba** (dev) — Crystal linter
 - LibC bindings for: `ioctl` (terminal size), `lstat`, `getpwuid_r`/`getgrgid_r` (owner/group), `strxfrm`/`setlocale` (locale-aware sorting)
 
 ## Key Implementation Notes

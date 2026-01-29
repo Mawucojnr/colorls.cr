@@ -3,7 +3,7 @@ require "option_parser"
 module Colorls
   class Flags
     @args : Array(String)
-    @config : Config
+    getter config : Config
     @report_mode : ReportMode = ReportMode::Off
     @exit_status_code : Int32 = 0
     @parse_error : Bool = false
@@ -43,7 +43,7 @@ module Colorls
       @args.each do |arg|
         begin
           info = FileInfo.info(arg, show_filepath: true)
-          if info.directory?
+          if info.directory? && !@config.directory_mode?
             dirs << info
           else
             files << info
@@ -88,7 +88,40 @@ module Colorls
       @config.colors = YamlConfig.new(color_scheme).load(aliase: true)
     end
 
+    # Flags that take a separate argument (e.g. -I PATTERN, -w COLS, -T COLS).
+    # When expanding combined short flags like "-laI", the character after one of
+    # these becomes the start of its argument value, not another flag.
+    FLAGS_WITH_ARGS = Set{'I', 'w', 'T'}
+
+    # Crystal's OptionParser doesn't support combined short flags (e.g. "-lart").
+    # GNU ls and most POSIX tools do via getopt. This method expands them so that
+    # "-lart" becomes ["-l", "-a", "-r", "-t"] before the parser sees them.
+    private def expand_combined_flags(args : Array(String)) : Array(String)
+      result = [] of String
+      args.each do |arg|
+        if arg.starts_with?("-") && !arg.starts_with?("--") && arg.size > 2
+          i = 1
+          while i < arg.size
+            ch = arg[i]
+            if FLAGS_WITH_ARGS.includes?(ch)
+              result << "-#{ch}"
+              rest = arg[(i + 1)..]
+              result << rest unless rest.empty?
+              break
+            else
+              result << "-#{ch}"
+            end
+            i += 1
+          end
+        else
+          result << arg
+        end
+      end
+      result
+    end
+
     private def parse_options
+      @args = expand_combined_flags(@args)
       @parser = OptionParser.new do |opts|
         opts.banner = "Usage:  colorls [OPTION]... [FILE]..."
         opts.separator ""
@@ -97,8 +130,14 @@ module Colorls
         add_format_options(opts)
         add_long_style_options(opts)
         add_sort_options(opts)
+        add_filter_options(opts)
+        add_name_transform_options(opts)
+        add_size_options(opts)
+        add_time_options(opts)
+        add_symlink_options(opts)
         add_compatibility_options(opts)
         add_general_options(opts)
+        add_stub_options(opts)
 
         opts.separator ""
         opts.on("--help", "prints this help") { show_help(opts); exit }
@@ -129,8 +168,14 @@ module Colorls
     private def add_common_options(opts : OptionParser)
       opts.on("-a", "--all", "do not ignore entries starting with .") { @config.all = true }
       opts.on("-A", "--almost-all", "do not list . and ..") { @config.almost_all = true }
-      opts.on("-d", "--dirs", "show only directories") { @config.show = ShowFilter::DirsOnly }
-      opts.on("-f", "--files", "show only files") { @config.show = ShowFilter::FilesOnly }
+      opts.on("--dirs", "show only directories") { @config.show = ShowFilter::DirsOnly }
+      opts.on("--files", "show only files") { @config.show = ShowFilter::FilesOnly }
+      opts.on("-d", "--directory", "list directories themselves, not their contents") { @config.directory_mode = true }
+      opts.on("-f", "do not sort, enable -aU, disable color") do
+        @config.sort = SortMode::None
+        @config.all = true
+        @config.color_enabled = false
+      end
       opts.on("--gs", "show git status for each file") { @config.show_git = true }
       opts.on("--git-status", "show git status for each file") { @config.show_git = true }
       opts.on("-p", "append / indicator to directories") { @config.indicator_style = IndicatorStyle::Slash }
@@ -141,18 +186,28 @@ module Colorls
                        else              ReportMode::Long
                        end
       end
-      opts.on("--indicator-style=STYLE", "append indicator: none, slash") do |style|
-        @config.indicator_style = style == "none" ? IndicatorStyle::None : IndicatorStyle::Slash
+      opts.on("--indicator-style=STYLE", "append indicator: none, slash, classify, file-type") do |style|
+        @config.indicator_style = case style
+                                  when "none"      then IndicatorStyle::None
+                                  when "slash"     then IndicatorStyle::Slash
+                                  when "classify"  then IndicatorStyle::Classify
+                                  when "file-type" then IndicatorStyle::FileType
+                                  else                  IndicatorStyle::Slash
+                                  end
       end
+      opts.on("-F", "--classify", "append indicator (*/=>@|) to entries") { @config.indicator_style = IndicatorStyle::Classify }
+      opts.on("--file-type", "like -F but do not append *") { @config.indicator_style = IndicatorStyle::FileType }
+      opts.on("-R", "--recursive", "list subdirectories recursively") { @config.recursive = true }
     end
 
     private def add_format_options(opts : OptionParser)
-      opts.on("--format=WORD", "use format: across, horizontal, long, single-column, vertical") do |word|
+      opts.on("--format=WORD", "use format: across, horizontal, long, single-column, vertical, commas") do |word|
         @config.mode = case word
                        when "across", "horizontal" then DisplayMode::Horizontal
                        when "vertical"             then DisplayMode::Vertical
                        when "long"                 then DisplayMode::Long
                        when "single-column"        then DisplayMode::OnePerLine
+                       when "commas"               then DisplayMode::Commas
                        else                             @config.mode
                        end
       end
@@ -163,6 +218,7 @@ module Colorls
       end
       opts.on("-x", "list entries by lines instead of by columns") { @config.mode = DisplayMode::Horizontal }
       opts.on("-C", "list entries by columns instead of by lines") { @config.mode = DisplayMode::Vertical }
+      opts.on("-m", "fill width with a comma separated list of entries") { @config.mode = DisplayMode::Commas }
       opts.on("--without-icons", "list entries without icons") { @config.icons = false }
     end
 
@@ -190,6 +246,12 @@ module Colorls
         lso.time_style = fmt
         @config.long_style_options = lso
       end
+      opts.on("--full-time", "like -l --time-style=full-iso") do
+        @config.mode = DisplayMode::Long
+        lso = @config.long_style_options
+        lso.time_style = "+%Y-%m-%d %H:%M:%S.%N %z"
+        @config.long_style_options = lso
+      end
       opts.on("--no-hardlinks", "show no hard links count") do
         lso = @config.long_style_options
         lso.hard_links_count = false
@@ -205,6 +267,11 @@ module Colorls
         lso.human_readable_size = false
         @config.long_style_options = lso
       end
+      opts.on("-n", "--numeric-uid-gid", "like -l, but list numeric user and group IDs") do
+        @config.mode = DisplayMode::Long
+        @config.numeric_ids = true
+      end
+      opts.on("--author", "with -l, print the author of each file") { @config.show_author = true }
     end
 
     private def add_sort_options(opts : OptionParser)
@@ -220,23 +287,113 @@ module Colorls
       opts.on("-U", "do not sort") { @config.sort = SortMode::None }
       opts.on("-S", "sort by file size") { @config.sort = SortMode::Size }
       opts.on("-X", "sort by file extension") { @config.sort = SortMode::Extension }
-      opts.on("--sort=WORD", "sort by WORD: none, size, time, extension") do |word|
+      opts.on("-v", "natural sort of (version) numbers within text") { @config.sort = SortMode::Version }
+      opts.on("--sort=WORD", "sort by WORD: none, size, time, extension, version") do |word|
         @config.sort = case word
                        when "none"      then SortMode::None
                        when "time"      then SortMode::Time
                        when "size"      then SortMode::Size
                        when "extension" then SortMode::Extension
+                       when "version"   then SortMode::Version
                        else                  SortMode::Name
                        end
       end
       opts.on("-r", "--reverse", "reverse order while sorting") { @config.reverse = true }
     end
 
+    private def add_filter_options(opts : OptionParser)
+      opts.separator ""
+      opts.separator "filter options:"
+      opts.separator ""
+      opts.on("-B", "--ignore-backups", "do not list entries ending with ~") { @config.ignore_backups = true }
+      opts.on("--hide=PATTERN", "do not list entries matching shell PATTERN") do |pattern|
+        @config.hide_patterns << pattern
+      end
+      opts.on("-I PATTERN", "--ignore=PATTERN", "do not list entries matching shell PATTERN") do |pattern|
+        @config.ignore_patterns << pattern
+      end
+    end
+
+    private def add_name_transform_options(opts : OptionParser)
+      opts.separator ""
+      opts.separator "name options:"
+      opts.separator ""
+      opts.on("-b", "--escape", "print C-style escapes for nongraphic characters") { @config.escape_chars = true }
+      opts.on("-q", "--hide-control-chars", "print ? instead of nongraphic characters") { @config.hide_control_chars = true }
+      opts.on("--show-control-chars", "show nongraphic characters as-is") { @config.show_control_chars = true }
+      opts.on("-N", "--literal", "print entry names without quoting") { } # already default behavior
+      opts.on("-Q", "--quote-name", "enclose entry names in double quotes") { @config.quote_name = true }
+      opts.on("--quoting-style=WORD", "use quoting style WORD") do |word|
+        @config.quoting_style = case word
+                                when "literal"             then QuotingStyle::Literal
+                                when "shell"               then QuotingStyle::Shell
+                                when "shell-always"        then QuotingStyle::ShellAlways
+                                when "shell-escape"        then QuotingStyle::ShellEscape
+                                when "shell-escape-always" then QuotingStyle::ShellEscapeAlways
+                                when "c"                   then QuotingStyle::C
+                                when "escape"              then QuotingStyle::Escape
+                                when "locale"              then QuotingStyle::Locale
+                                when "clocale"             then QuotingStyle::Clocale
+                                else                            QuotingStyle::Literal
+                                end
+      end
+    end
+
+    private def add_size_options(opts : OptionParser)
+      opts.separator ""
+      opts.separator "size options:"
+      opts.separator ""
+      opts.on("-s", "--size", "print the allocated size of each file, in blocks") { @config.show_blocks = true }
+      opts.on("--block-size=SIZE", "scale sizes by SIZE before printing") do |size_str|
+        @config.block_size = parse_block_size(size_str)
+      end
+      opts.on("--si", "like -h but use powers of 1000 not 1024") { @config.si_units = true }
+      opts.on("-k", "--kibibytes", "default to 1024-byte blocks for -s") { @config.kibibytes = true }
+      opts.on("-w COLS", "--width=COLS", "set output width to COLS") do |cols|
+        @config.width_override = cols.to_i? || 80
+      end
+      opts.on("-T COLS", "--tabsize=COLS", "assume tab stops at each COLS instead of 8") do |cols|
+        @config.tab_size = cols.to_i? || 8
+      end
+    end
+
+    private def add_time_options(opts : OptionParser)
+      opts.separator ""
+      opts.separator "time options:"
+      opts.separator ""
+      opts.on("-c", "with -lt: sort by, and show, ctime; with -l: show ctime and sort by name") do
+        @config.time_field = TimeField::Change
+      end
+      opts.on("-u", "with -lt: sort by, and show, atime; with -l: show atime and sort by name") do
+        @config.time_field = TimeField::Access
+      end
+      opts.on("--time=WORD", "select time: atime, access, use, ctime, status, birth") do |word|
+        @config.time_field = case word
+                             when "atime", "access", "use" then TimeField::Access
+                             when "ctime", "status"        then TimeField::Change
+                             when "birth", "creation"      then TimeField::Birth
+                             else                               TimeField::Modification
+                             end
+      end
+    end
+
+    private def add_symlink_options(opts : OptionParser)
+      opts.separator ""
+      opts.separator "symlink options:"
+      opts.separator ""
+      opts.on("-H", "--dereference-command-line", "follow symbolic links listed on the command line") do
+        @config.dereference_mode = DereferenceMode::CommandLine
+      end
+      opts.on("--dereference-command-line-symlink-to-dir", "follow command line symlinks that point to directories") do
+        @config.dereference_mode = DereferenceMode::CommandLineDirs
+      end
+    end
+
     private def add_compatibility_options(opts : OptionParser)
       opts.separator ""
-      opts.separator "options for compatibility with ls (ignored):"
+      opts.separator "options for compatibility with ls:"
       opts.separator ""
-      opts.on("-h", "--human-readable", "") { } # always active
+      opts.on("-h", "--human-readable", "with -l, print sizes in human readable format") { } # always active
     end
 
     private def add_general_options(opts : OptionParser)
@@ -249,6 +406,42 @@ module Colorls
       opts.on("--light", "use light color scheme") { @config.light_colors = true }
       opts.on("--dark", "use dark color scheme") { @config.light_colors = false }
       opts.on("--hyperlink", "show hyperlinks") { @config.hyperlink = true }
+    end
+
+    private def add_stub_options(opts : OptionParser)
+      opts.separator ""
+      opts.on("-D", "--dired", "generate output designed for Emacs' dired mode") do
+        STDERR.puts "colorls: --dired is not implemented"
+      end
+      opts.on("-Z", "--context", "print any security context of each file") do
+        # Accept but no-op on non-SELinux systems
+      end
+    end
+
+    private def parse_block_size(str : String) : Int64
+      multiplier = 1_i64
+      s = str.strip.upcase
+      if s.ends_with?("K")
+        multiplier = 1024_i64
+        s = s.chomp("K")
+      elsif s.ends_with?("M")
+        multiplier = 1024_i64 * 1024
+        s = s.chomp("M")
+      elsif s.ends_with?("G")
+        multiplier = 1024_i64 * 1024 * 1024
+        s = s.chomp("G")
+      elsif s.ends_with?("KB")
+        multiplier = 1000_i64
+        s = s.chomp("KB")
+      elsif s.ends_with?("MB")
+        multiplier = 1000_i64 * 1000
+        s = s.chomp("MB")
+      elsif s.ends_with?("GB")
+        multiplier = 1000_i64 * 1000 * 1000
+        s = s.chomp("GB")
+      end
+      base = s.to_i64? || 1_i64
+      base * multiplier
     end
 
     private def show_help(opts : OptionParser)

@@ -22,6 +22,7 @@ module Colorls
     @show_human_readable_size : Bool
     @tree : NamedTuple(mode: Bool, depth: Int32)
     @horizontal : Bool
+    @commas : Bool
     @show_git : Bool
     @git_status : Hash(String, Git::StatusHash?)
     @time_style : String
@@ -38,8 +39,28 @@ module Colorls
     @linklength : Int32 = 0
     @userlength : Int32 = 0
     @grouplength : Int32 = 0
+    @authorlength : Int32 = 0
     @chars_for_size : Int32? = nil
     @color_enabled : Bool
+
+    # GNU ls compatibility
+    @ignore_backups : Bool
+    @hide_patterns : Array(String)
+    @ignore_patterns : Array(String)
+    @numeric_ids : Bool
+    @show_author : Bool
+    @si_units : Bool
+    @show_blocks : Bool
+    @block_size : Int64
+    @kibibytes : Bool
+    @time_field : TimeField
+    @escape_chars : Bool
+    @hide_control_chars : Bool
+    @show_control_chars : Bool
+    @quote_name : Bool
+    @quoting_style : QuotingStyle
+    @recursive : Bool
+    @width_override : Int32?
 
     def initialize(config : Config)
       @count = {:folders => 0, :recognized_files => 0, :unrecognized_files => 0}
@@ -59,6 +80,7 @@ module Colorls
       @show_human_readable_size = config.long_style_options.human_readable_size?
       @tree = {mode: config.mode == DisplayMode::Tree, depth: config.tree_depth}
       @horizontal = config.mode == DisplayMode::Horizontal
+      @commas = config.mode == DisplayMode::Commas
       @show_git = config.show_git?
       @git_status = {} of String => Git::StatusHash?
       @time_style = config.long_style_options.time_style
@@ -73,6 +95,25 @@ module Colorls
       @file_aliases = {} of String => String
       @folders = {} of String => String
       @folder_aliases = {} of String => String
+
+      # GNU ls compatibility
+      @ignore_backups = config.ignore_backups?
+      @hide_patterns = config.hide_patterns
+      @ignore_patterns = config.ignore_patterns
+      @numeric_ids = config.numeric_ids?
+      @show_author = config.show_author?
+      @si_units = config.si_units?
+      @show_blocks = config.show_blocks?
+      @block_size = config.block_size
+      @kibibytes = config.kibibytes?
+      @time_field = config.time_field
+      @escape_chars = config.escape_chars?
+      @hide_control_chars = config.hide_control_chars?
+      @show_control_chars = config.show_control_chars?
+      @quote_name = config.quote_name?
+      @quoting_style = config.quoting_style
+      @recursive = config.recursive?
+      @width_override = config.width_override
 
       init_colors
       init_icons
@@ -93,6 +134,7 @@ module Colorls
         .map { |e| FileInfo.dir_entry(info.path, e, link_info: @long) }
 
       filter_contents if @show != ShowFilter::All
+      apply_pattern_filters
       sort_contents if @sort != SortMode::None
       group_contents if @group != GroupMode::None
 
@@ -102,6 +144,14 @@ module Colorls
       end
 
       ls
+
+      if @recursive
+        @contents.select(&.directory?).each do |dir_entry|
+          next if dir_entry.name == "." || dir_entry.name == ".."
+          puts "\n#{dir_entry.path}:"
+          ls_dir(dir_entry)
+        end
+      end
     end
 
     def ls_files(files : Array(FileInfo))
@@ -129,21 +179,47 @@ module Colorls
       end
     end
 
+    private def effective_screen_width : Int32
+      @width_override || Colorls.screen_width
+    end
+
     private def ls
       init_column_lengths
 
-      layout = if @horizontal
-                 HorizontalLayout.new(@contents, item_widths, Colorls.screen_width)
+      layout = if @commas
+                 nil # handled separately
+               elsif @horizontal
+                 HorizontalLayout.new(@contents, item_widths, effective_screen_width)
                elsif @one_per_line || @long
                  SingleColumnLayout.new(@contents)
                else
-                 VerticalLayout.new(@contents, item_widths, Colorls.screen_width)
+                 VerticalLayout.new(@contents, item_widths, effective_screen_width)
                end
 
-      layout.each_line do |line, widths|
-        ls_line(line, widths)
+      if @commas
+        ls_commas
+      elsif layout
+        layout.each_line do |line, widths|
+          ls_line(line, widths)
+        end
       end
       @chars_for_size = nil
+    end
+
+    private def ls_commas
+      line = String::Builder.new
+      first = true
+      @contents.each do |content|
+        key, color_name, group = options(content)
+        @count[group] = (@count[group]? || 0) + 1
+        entry = format_entry(content, key, color_name, group)
+        unless first
+          line << ", "
+        end
+        line << entry
+        first = false
+      end
+      puts line.to_s
     end
 
     private def init_colors
@@ -174,23 +250,43 @@ module Colorls
       entries
     end
 
+    private def apply_pattern_filters
+      if @ignore_backups
+        @contents.reject!(&.name.ends_with?('~'))
+      end
+      @hide_patterns.each do |pattern|
+        @contents.reject! { |entry| File.match?(pattern, entry.name) }
+      end
+      @ignore_patterns.each do |pattern|
+        @contents.reject! { |entry| File.match?(pattern, entry.name) }
+      end
+    end
+
     private def init_column_lengths
       return unless @long
 
       maxlink = 0_i64
       maxuser = 0
       maxgroup = 0
+      maxauthor = 0
 
       @contents.each do |content|
         nl = content.nlink
         maxlink = nl if nl > maxlink
-        maxuser = content.owner.size if content.owner.size > maxuser
-        maxgroup = content.group.size if content.group.size > maxgroup
+        user_str = content.owner_or_uid(@numeric_ids)
+        maxuser = user_str.size if user_str.size > maxuser
+        group_str = content.group_or_gid(@numeric_ids)
+        maxgroup = group_str.size if group_str.size > maxgroup
+        if @show_author
+          author_str = content.author
+          maxauthor = author_str.size if author_str.size > maxauthor
+        end
       end
 
       @linklength = maxlink.to_s.size
       @userlength = maxuser
       @grouplength = maxgroup
+      @authorlength = maxauthor
     end
 
     private def filter_contents
@@ -208,13 +304,44 @@ module Colorls
           {strxfrm(ext), strxfrm(base)}
         end
       when SortMode::Time
-        @contents.sort_by! { |entry| -entry.mtime.to_unix_f }
+        @contents.sort_by! { |entry| -entry.time_for(@time_field).to_unix_f }
       when SortMode::Size
         @contents.sort_by! { |entry| -entry.size }
+      when SortMode::Version
+        @contents.sort! { |left, right| version_compare(left.name, right.name) }
       else # Name
         @contents.sort_by! { |entry| strxfrm(entry.name) }
       end
       @contents.reverse! if @reverse
+    end
+
+    private def version_compare(a : String, b : String) : Int32
+      a_parts = version_split(a)
+      b_parts = version_split(b)
+      max = Math.max(a_parts.size, b_parts.size)
+      max.times do |i|
+        ap = i < a_parts.size ? a_parts[i] : {"", 0_i64}
+        bp = i < b_parts.size ? b_parts[i] : {"", 0_i64}
+        # Compare text parts first
+        cmp = ap[0] <=> bp[0]
+        return cmp unless cmp == 0
+        # Then numeric parts
+        cmp = ap[1] <=> bp[1]
+        return cmp unless cmp == 0
+      end
+      0
+    end
+
+    private def version_split(name : String) : Array({String, Int64})
+      parts = [] of {String, Int64}
+      name.scan(/(\d+)|(\D+)/) do |match|
+        if digit = match[1]?
+          parts << {"", digit.to_i64}
+        elsif text = match[2]?
+          parts << {text, 0_i64}
+        end
+      end
+      parts
     end
 
     private def group_contents
@@ -246,22 +373,33 @@ module Colorls
     end
 
     private def user_info(content : FileInfo) : String
-      colorize(content.owner.ljust(@userlength), "user")
+      name = content.owner_or_uid(@numeric_ids)
+      colorize(name.ljust(@userlength), "user")
     end
 
-    private def group_info(grp : String) : String
-      colorize(grp.ljust(@grouplength), "normal")
+    private def group_info(content : FileInfo) : String
+      name = content.group_or_gid(@numeric_ids)
+      colorize(name.ljust(@grouplength), "normal")
+    end
+
+    private def author_info(content : FileInfo) : String
+      colorize(content.author.ljust(@authorlength), "user")
     end
 
     private def humanize_size(bytes : Int64) : String
-      if bytes < 1024
-        "#{bytes} B"
-      elsif bytes < 1024 * 1024
-        "#{"%.0f" % (bytes / 1024.0)} K"
-      elsif bytes < 1024 * 1024 * 1024
-        "#{"%.0f" % (bytes / (1024.0 * 1024))} M"
+      base = @si_units ? 1000.0 : 1024.0
+      units = @si_units ? ["B", "kB", "MB", "GB", "TB"] : ["B", "K", "M", "G", "T"]
+
+      if bytes < base
+        "#{bytes} #{units[0]}"
+      elsif bytes < base * base
+        "#{"%.0f" % (bytes / base)} #{units[1]}"
+      elsif bytes < base * base * base
+        "#{"%.0f" % (bytes / (base * base))} #{units[2]}"
+      elsif bytes < base * base * base * base
+        "#{"%.0f" % (bytes / (base * base * base))} #{units[3]}"
       else
-        "#{"%.0f" % (bytes / (1024.0 * 1024 * 1024))} G"
+        "#{"%.0f" % (bytes / (base * base * base * base))} #{units[4]}"
       end
     end
 
@@ -298,21 +436,34 @@ module Colorls
                           end
     end
 
-    private def mtime_info(file_mtime : Time) : String
-      mtime_str = if @time_style.starts_with?('+')
-                    file_mtime.to_s(@time_style.lchop('+'))
-                  else
-                    file_mtime.to_s("%a %b %e %T %Y")
-                  end
+    private def time_info(content : FileInfo) : String
+      file_time = content.time_for(@time_field)
+      time_str = if @time_style.starts_with?('+')
+                   file_time.to_s(@time_style.lchop('+'))
+                 else
+                   file_time.to_s("%a %b %e %T %Y")
+                 end
       now = Time.local
-      diff = now - file_mtime
+      diff = now - file_time
       if diff < 1.hour
-        colorize(mtime_str, "hour_old")
+        colorize(time_str, "hour_old")
       elsif diff < 1.day
-        colorize(mtime_str, "day_old")
+        colorize(time_str, "day_old")
       else
-        colorize(mtime_str, "no_modifier")
+        colorize(time_str, "no_modifier")
       end
+    end
+
+    private def blocks_info(content : FileInfo) : String
+      blk = content.blocks
+      # blocks from stat are in 512-byte units; convert to block_size
+      bytes = blk * 512_i64
+      display_blocks = if @kibibytes
+                         (bytes + 1023) // 1024
+                       else
+                         (bytes + @block_size - 1) // @block_size
+                       end
+      "#{display_blocks} "
     end
 
     private def git_info(content : FileInfo) : String
@@ -364,6 +515,92 @@ module Colorls
       colorize(content.raw_stat.st_ino.to_s.rjust(10), "inode")
     end
 
+    private def indicator_suffix(content : FileInfo) : String
+      case @indicator_style
+      when IndicatorStyle::None     then " "
+      when IndicatorStyle::Slash    then content.directory? ? "/" : " "
+      when IndicatorStyle::Classify then classify_indicator(content)
+      when IndicatorStyle::FileType then file_type_indicator(content)
+      else                               " "
+      end
+    end
+
+    private def classify_indicator(content : FileInfo) : String
+      return "/" if content.directory?
+      return "@" if content.symlink?
+      return "*" if content.executable?
+      return "|" if content.pipe?
+      return "=" if content.socket?
+      " "
+    end
+
+    private def file_type_indicator(content : FileInfo) : String
+      return "/" if content.directory?
+      return "@" if content.symlink?
+      return "|" if content.pipe?
+      return "=" if content.socket?
+      " "
+    end
+
+    private def transform_name(name : String) : String
+      result = apply_quoting(name)
+
+      if @hide_control_chars && !@show_control_chars
+        result = result.gsub(/[\x00-\x1f\x7f]/, '?')
+      end
+
+      result
+    end
+
+    private def apply_quoting(name : String) : String
+      return c_quote(name) if @quote_name || @quoting_style == QuotingStyle::C
+      return c_escape(name) if @escape_chars
+      apply_quoting_style(name)
+    end
+
+    private def c_quote(name : String) : String
+      "\"#{c_escape(name)}\""
+    end
+
+    private def apply_quoting_style(name : String) : String
+      case @quoting_style
+      when QuotingStyle::Escape            then c_escape(name)
+      when QuotingStyle::Shell             then shell_quote(name, always: false)
+      when QuotingStyle::ShellAlways       then shell_quote(name, always: true)
+      when QuotingStyle::ShellEscape       then shell_escape(name, always: false)
+      when QuotingStyle::ShellEscapeAlways then shell_escape(name, always: true)
+      when QuotingStyle::Locale            then "\u2018#{c_escape(name)}\u2019"
+      when QuotingStyle::Clocale           then c_quote(name)
+      else                                      name
+      end
+    end
+
+    private def c_escape(str : String) : String
+      str.gsub('\\', "\\\\").gsub('"', "\\\"")
+        .gsub('\n', "\\n").gsub('\r', "\\r").gsub('\t', "\\t")
+        .gsub(/[\x00-\x1f\x7f]/) { |char| "\\%03o" % char.bytes.first }
+    end
+
+    private def shell_quote(str : String, always : Bool) : String
+      if always || str =~ /[^a-zA-Z0-9._\-\/]/
+        "'#{str.gsub("'", "\\'")}'"
+      else
+        str
+      end
+    end
+
+    private def shell_escape(str : String, always : Bool) : String
+      if always || str =~ /[^a-zA-Z0-9._\-\/]/
+        escaped = str.gsub("'", "'\\''")
+        escaped = escaped.gsub(/[\x00-\x1f\x7f]/) do |char|
+          "'$'\\%03o'''" % char.bytes.first
+        end
+        "'#{escaped}'"
+      else
+        str
+      end
+    end
+
     private def long_info(content : FileInfo) : String
       return "" unless @long
 
@@ -372,9 +609,10 @@ module Colorls
       parts = [mode_info(content)]
       parts << links if @hard_links_count
       parts << user_info(content) if @show_user
-      parts << group_info(content.group) if @show_group
+      parts << group_info(content) if @show_group
+      parts << author_info(content) if @show_author
       parts << size_info(content.size)
-      parts << mtime_info(content.mtime)
+      parts << time_info(content)
       parts.join("   ")
     end
 
@@ -417,8 +655,8 @@ module Colorls
 
     private def format_entry(content : FileInfo, key : String, color_name : String, increment : Symbol) : String
       logo = icon_for(key, increment)
-      name = @hyperlink ? make_link(content) : content.show
-      name += content.directory? && @indicator_style != IndicatorStyle::None ? "/" : " "
+      name = transform_name(@hyperlink ? make_link(content) : content.show)
+      name += indicator_suffix(content)
 
       entry = @icons ? "#{logo}  #{name}" : name
       if !content.directory? && content.executable?
@@ -434,7 +672,8 @@ module Colorls
       symlink_str = symlink_info(content)
       display_content = update_content_if_show_symbol_dest(content)
 
-      "#{inode(display_content)} #{long_info(display_content)} #{git_info(display_content)} #{entry}#{symlink_str}"
+      blocks_str = @show_blocks ? blocks_info(display_content) : ""
+      "#{blocks_str}#{inode(display_content)} #{long_info(display_content)} #{git_info(display_content)} #{entry}#{symlink_str}"
     end
 
     private def ls_line(chunk : Array(FileInfo), widths : Array(Int32))
@@ -502,6 +741,7 @@ module Colorls
       entries = Dir.entries(path)
       @contents = filter_hidden(entries).map { |e| FileInfo.dir_entry(path, e, link_info: @long) }
       filter_contents if @show != ShowFilter::All
+      apply_pattern_filters
       sort_contents if @sort != SortMode::None
       group_contents if @group != GroupMode::None
       @contents

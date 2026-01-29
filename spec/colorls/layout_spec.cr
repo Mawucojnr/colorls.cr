@@ -46,4 +46,23 @@ describe Colorls::VerticalLayout do
     layout.each_line { |line, _| lines << line }
     lines.size.should be > 0
   end
+
+  it "respects narrow width" do
+    items = (1..6).map { |i| make_test_file("file#{i}") }.to_a
+    widths = items.map { |_| 15 }
+    layout = Colorls::VerticalLayout.new(items, widths, 20)
+    lines = [] of Array(Colorls::FileInfo)
+    layout.each_line { |line, _| lines << line }
+    # Narrow width should produce more lines (fewer columns)
+    lines.size.should be >= 3
+  end
+
+  it "handles single item" do
+    items = [make_test_file("solo")]
+    widths = [10]
+    layout = Colorls::VerticalLayout.new(items, widths, 80)
+    lines = [] of Array(Colorls::FileInfo)
+    layout.each_line { |line, _| lines << line }
+    lines.size.should eq(1)
+  end
 end
