@@ -1,0 +1,15 @@
+name: colorls
+version: 1.0.0
+targets:
+  colorls:
+    main: src/colorls_cli.cr
+crystal: ">= 1.15.0"
+license: MIT
+dependencies:
+  unicode_width:
+    github: wyhaines/unicode_width.cr
+    version: ~> 1.0.0
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.6.4

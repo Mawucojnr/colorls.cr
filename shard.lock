@@ -1,0 +1,10 @@
+version: 2.0
+shards:
+  ameba:
+    git: https://github.com/crystal-ameba/ameba.git
+    version: 1.6.4
+
+  unicode_width:
+    git: https://github.com/wyhaines/unicode_width.cr.git
+    version: 1.0.0
+
