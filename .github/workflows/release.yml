@@ -63,6 +63,9 @@ jobs:
       image: crystallang/crystal:latest-alpine
 
     steps:
+      - name: Install gh CLI
+        run: apk add --no-cache github-cli
+
       - uses: actions/checkout@v4
 
       - name: Install dependencies
