@@ -39,13 +39,12 @@ Available builds:
 | Archive | Platform |
 |---------|----------|
 | `colorls-linux-x86_64-static.tar.gz` | Linux x86_64 (static, portable) |
-| `colorls-linux-aarch64-static.tar.gz` | Linux ARM64 (static, portable) |
 | `colorls-linux-x86_64.tar.gz` | Linux x86_64 (dynamic) |
 | `colorls-linux-aarch64.tar.gz` | Linux ARM64 (dynamic) |
 | `colorls-darwin-x86_64.tar.gz` | macOS Intel |
 | `colorls-darwin-aarch64.tar.gz` | macOS Apple Silicon |
 
-The static Linux builds have no runtime dependencies and work on any Linux distribution. The dynamic builds require a compatible system libc.
+The static Linux build has no runtime dependencies and works on any Linux distribution. The dynamic builds require a compatible system libc.
 
 ### Building from source
 

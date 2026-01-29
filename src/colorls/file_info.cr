@@ -81,12 +81,20 @@ module Colorls
 
     def atime : Time
       stat = raw_stat
-      Time.unix(stat.st_atim.tv_sec) + Time::Span.new(nanoseconds: stat.st_atim.tv_nsec)
+      {% if flag?(:darwin) %}
+        Time.unix(stat.st_atimespec.tv_sec) + Time::Span.new(nanoseconds: stat.st_atimespec.tv_nsec)
+      {% else %}
+        Time.unix(stat.st_atim.tv_sec) + Time::Span.new(nanoseconds: stat.st_atim.tv_nsec)
+      {% end %}
     end
 
     def ctime : Time
       stat = raw_stat
-      Time.unix(stat.st_ctim.tv_sec) + Time::Span.new(nanoseconds: stat.st_ctim.tv_nsec)
+      {% if flag?(:darwin) %}
+        Time.unix(stat.st_ctimespec.tv_sec) + Time::Span.new(nanoseconds: stat.st_ctimespec.tv_nsec)
+      {% else %}
+        Time.unix(stat.st_ctim.tv_sec) + Time::Span.new(nanoseconds: stat.st_ctim.tv_nsec)
+      {% end %}
     end
 
     def blocks : Int64
